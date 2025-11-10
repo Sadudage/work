@@ -62,7 +62,7 @@ def generate_kindle_chart(kindledata,date_data,codename):
     )
     return kindle_line
 
-def generate_line_chart(df,datelist,ma):
+def generate_maline_chart(df,datelist,ma):
     pricelist = df['close'].tolist()
     line = Line()
     line.add_xaxis(datelist)
@@ -72,6 +72,11 @@ def generate_line_chart(df,datelist,ma):
         line.add_yaxis(maname,ma_value, yaxis_index=1,symbol="none",label_opts=opts.LabelOpts(is_show=False),is_smooth=True)
     return line
 
+def generate_line_chart(datas,datelist):
+    line = Line()
+    line.add_xaxis(datelist)
+    line.add_yaxis('收益曲线',datas, yaxis_index=1,symbol="none",label_opts=opts.LabelOpts(is_show=False),is_smooth=True)
+    return line
 
 #生成成交量图
 def generate_volbar_chart(voldata, date_data):
@@ -237,13 +242,13 @@ def generate_pic_by_df(tmpdata, buypoint = [], ma=[20]):
     macd_data,dif,dea = cau_macd(tmpdata['close'].tolist())
     
     kindle_chart = generate_kindle_chart(original_kline,datelist,codename)
-    line_chart = generate_line_chart(tmpdata,datelist,ma)
+    maline_chart = generate_maline_chart(tmpdata,datelist,ma)
     draw_chart = generate_line_chart_square_area(draw,'draw','blue',zs_area)
     vol_chart = generate_volbar_chart(vol_data, datelist)
     macd_chart = generate_macdbar_chart(macd_data,dif,dea,datelist)
     
     kindle_chart.overlap(draw_chart)
-    kindle_chart.overlap(line_chart)
+    kindle_chart.overlap(maline_chart)
     if buypoint != []:
         buy_chart = create_point(buypoint)
         if buy_chart:
