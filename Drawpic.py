@@ -72,11 +72,14 @@ def generate_maline_chart(df,datelist,ma):
         line.add_yaxis(maname,ma_value, yaxis_index=1,symbol="none",label_opts=opts.LabelOpts(is_show=False),is_smooth=True)
     return line
 
-def generate_line_chart(datas,datelist):
+def generate_line_chart(datas,datelist,chartname='默认'):
     line = Line()
+    line.set_global_opts(title_opts=opts.TitleOpts(title="Line-smooth"))
     line.add_xaxis(datelist)
-    line.add_yaxis('收益曲线',datas, yaxis_index=1,symbol="none",label_opts=opts.LabelOpts(is_show=False),is_smooth=True)
+    line.add_yaxis(chartname,datas, is_smooth=True,label_opts=opts.LabelOpts(is_show=False),)
     return line
+
+
 
 #生成成交量图
 def generate_volbar_chart(voldata, date_data):
