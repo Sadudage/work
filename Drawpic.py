@@ -74,7 +74,16 @@ def generate_maline_chart(df,datelist,ma):
 
 def generate_line_chart(datas,datelist,chartname='默认'):
     line = Line()
-    line.set_global_opts(title_opts=opts.TitleOpts(title="Line-smooth"))
+    line.set_global_opts(
+        title_opts=opts.TitleOpts(title="Line-smooth"),
+        xaxis_opts=opts.AxisOpts(type_="category", is_scale=True),
+        yaxis_opts=opts.AxisOpts(is_scale=True),
+        tooltip_opts=opts.TooltipOpts(trigger="axis"),  # 鼠标悬停显示浮窗
+        datazoom_opts=[
+                    opts.DataZoomOpts(range_start = 50, range_end = 100, type_="inside", xaxis_index=[0, 1, 2]),  # 同步到两个图表
+                    opts.DataZoomOpts(range_start = 50, range_end = 100, type_="slider", xaxis_index=[0, 1, 2])   # 同步到两个图表
+                ]
+    )
     line.add_xaxis(datelist)
     line.add_yaxis(chartname,datas, is_smooth=True,label_opts=opts.LabelOpts(is_show=False),)
     return line
