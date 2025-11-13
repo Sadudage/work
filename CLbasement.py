@@ -6,7 +6,7 @@ import pandas as pd
 import json
 from datetime import datetime
 
-DRAW_GAP = 4
+DRAW_GAP = 3
 
 def generate_orignal_kindle_data(tmp_data):
     #返回只有开收低高的K线列表
@@ -270,6 +270,7 @@ def gen_zs_pos(start_x,start_y,end_x,end_y):
     #存储完成的中枢坐标
     return tmp_list
 
+
 def generate_zs_area(draw):
     #生成中枢区域
     mark_areas = []
@@ -376,6 +377,258 @@ def generate_zs_area(draw):
 
     return mark_areas
 
+# ----------------------------------------------------------------
+# -----------------------第二种生成中枢的方式-----------------------
+# ----------------------------------------------------------------
+#基于笔生成zs区间
+def uplevel_zsbase(ddata):
+    mark_areas = []
+    zs_sx = 0
+    zs_ex = 0
+    zs_dir = 0
+    zs_inf = 2
+    seg_dir = 0
+    zs_high = 0
+    zs_low = 0
+    reverse_h = 0
+    reverse_l = 0
+    judge_zs_reverse = 0
+    
+    if (ddata[1][1] > ddata[0][1]) and (ddata[2][1] <= ddata[0][1]):
+        zs_dir = 0
+        zs_sx = 0
+        segdir = 0
+        reverse_h = ddata[1][1]
+        reverse_l = ddata[0][1]
+    elif (ddata[1][1] > ddata[0][1]) and (ddata[2][1] > ddata[0][1]):
+        zs_dir = 1
+        zs_sx = 1
+        segdir = 0
+        reverse_h = ddata[1][1]
+        reverse_l = ddata[2][1]
+    elif (ddata[1][1] < ddata[0][1]) and (ddata[2][1] > ddata[0][1]):
+        zs_dir = 1
+        zs_sx = 0
+        segdir = 1
+        reverse_h = ddata[0][1]
+        reverse_l = ddata[1][1]
+    elif (ddata[1][1] < ddata[0][1]) and (ddata[2][1] <= ddata[0][1]):
+        zs_dir = 0
+        zs_sx = 1
+        segdir = 1
+        reverse_h = ddata[2][1]
+        reverse_l = ddata[1][1]
+
+    for i in range(3,len(ddata)):
+        curx = ddata[i][0]
+        v0 = ddata[i][1]
+        v1 = ddata[i-1][1]
+        v2 = ddata[i-2][1]
+        v3 = ddata[i-3][1]
+        v4 = ddata[i-4][1]
+        segdir = 1 - segdir
+        
+        #zs direction = up
+        if zs_dir == 1:  
+            #笔向上
+            if segdir == 1:
+                #没有转折判断
+                if judge_zs_reverse == 0:
+                    #上一点比上一个转折点高
+                    if v0 >= reverse_h:
+                        #产生了新中枢
+                        if (v1 >= zs_high) and (i > 3):
+                            zs_ex = i-3
+                            zs_high,zs_low = evenoddcheck(ddata,zs_sx,zs_ex+1,1)
+                            mark_areas.append(gen_zs_pos(ddata[zs_sx][0],zs_high,ddata[zs_ex][0],zs_low))
+                            zs_sx = i-2
+                            zs_high,zs_low = evenoddcheck(ddata,zs_sx,i,1)
+                            zs_inf = 2
+                        #没有产生新中枢
+                        elif v1 < zs_high:
+                            zs_high,zs_low = evenoddcheck(ddata,zs_sx,i,1)
+                            zs_inf += 1
+                    #上一点比上一个转折点低，下面进入转折判断
+                    elif (v0 < reverse_h) and (i > 3):
+                        judge_zs_reverse = 1
+                        zs_ex = i-3
+                        zs_high,zs_low = evenoddcheck(ddata,zs_sx,zs_ex+1,1)
+                #有转折判断：
+                elif judge_zs_reverse == 1:
+                    #此笔比转折高点高，则趋势延续
+                    if v0 >= reverse_h:
+                        tmphigh,tmplow = evenoddcheck(ddata,i-4,i,1)
+                        #产生新中枢
+                        if tmplow >= zs_high:
+                            mark_areas.append(gen_zs_pos(ddata[zs_sx][0],zs_high,ddata[zs_ex][0],zs_low))
+                            zs_sx = i-4
+                            zs_high,zs_low = evenoddcheck(ddata,zs_sx,i,1)
+                        #没产生新中枢
+                        elif tmplow < zs_high:
+                            zs_high,zs_low = evenoddcheck(ddata,zs_sx,i,1)
+                    #此笔比转折点低，则变为向下趋势
+                    elif v0 < reverse_h:
+                        mark_areas.append(gen_zs_pos(ddata[zs_sx][0],zs_high,ddata[zs_ex][0],zs_low))
+                        zs_sx = i-3
+                        zs_high,zs_low = evenoddcheck(ddata,zs_sx,i-1,0)
+                        reverse_h = v0
+                        reverse_l = v1
+                        zs_dir = 0
+                    judge_zs_reverse = 0
+            #笔向下
+            elif segdir == 0:
+                #有转折判断
+                if judge_zs_reverse == 0:
+                    #刷新转折点
+                    reverse_h = v1
+                    reverse_l = v0
+                #转折判断过程中:
+                elif judge_zs_reverse == 1:
+                    if v0 <= v4:
+                        mark_areas.append(gen_zs_pos(ddata[zs_sx][0],zs_high,ddata[zs_ex][0],zs_low))
+                        zs_sx = i-2
+                        zs_high,zs_low = evenoddcheck(ddata,zs_sx,i,0)
+                        reverse_h = v1
+                        reverse_l = v2
+                        zs_dir = 0
+                        judge_zs_reverse = 0
+                    
+        #zs direction = down
+        elif zs_dir == 0:  
+            #笔向上
+            if segdir == 0:
+                #没有转折判断
+                if judge_zs_reverse == 0:
+                    #比上一个转折点低
+                    if v0 <= reverse_l:
+                        #产生了新中枢
+                        if (v1 <= zs_low) and (i > 3):
+                            zs_ex = i-3
+                            zs_high,zs_low = evenoddcheck(ddata,zs_sx,zs_ex+1,0)
+                            mark_areas.append(gen_zs_pos(ddata[zs_sx][0],zs_high,ddata[zs_ex][0],zs_low))
+                            zs_sx = i-2
+                            zs_high,zs_low = evenoddcheck(ddata,zs_sx,i,0)
+                            zs_inf = 2
+                        #没有产生新中枢
+                        elif v1 > zs_low:
+                            zs_high,zs_low = evenoddcheck(ddata,zs_sx,i,0)
+                            zs_inf += 1
+                    #比上一个转折点低，下面进入转折判断
+                    elif (v0 > reverse_l) and (i > 3):
+                        judge_zs_reverse = 1
+                        zs_ex = i-3
+                        zs_high,zs_low = evenoddcheck(ddata,zs_sx,zs_ex+1,0)
+                #有转折判断：
+                elif judge_zs_reverse == 1:
+                    #此笔比转折高点高，则趋势延续
+                    if v0 <= reverse_l:
+                        tmphigh,tmplow = evenoddcheck(ddata,i-4,i,0)
+                        #产生新中枢
+                        if tmphigh <= zs_low:
+                            mark_areas.append(gen_zs_pos(ddata[zs_sx][0],zs_high,ddata[zs_ex][0],zs_low))
+                            zs_sx = i-4
+                            zs_high,zs_low = evenoddcheck(ddata,zs_sx,i,0)
+                        #没产生新中枢
+                        elif tmphigh > zs_low:
+                            zs_high,zs_low = evenoddcheck(ddata,zs_sx,i,0)
+                    #此笔比转折点低，则变为向下趋势
+                    elif v0 > reverse_l:
+                        mark_areas.append(gen_zs_pos(ddata[zs_sx][0],zs_high,ddata[zs_ex][0],zs_low))
+                        zs_sx = i-3
+                        zs_high,zs_low = evenoddcheck(ddata,zs_sx,i-1,1)
+                        reverse_h = v1
+                        reverse_l = v0
+                        zs_dir = 1
+                    judge_zs_reverse = 0
+            #笔向下
+            elif segdir == 1:
+                #有转折判断
+                if judge_zs_reverse == 0:
+                    #刷新转折点
+                    reverse_h = v0
+                    reverse_l = v1
+                #转折判断过程中
+                elif judge_zs_reverse == 1:
+                    if v0 >= v4:
+                        mark_areas.append(gen_zs_pos(ddata[zs_sx][0],zs_high,ddata[zs_ex][0],zs_low))
+                        zs_sx = i-2
+                        zs_high,zs_low = evenoddcheck(ddata,zs_sx,i,1)
+                        reverse_h = v2
+                        reverse_l = v1
+                        zs_dir = 1
+                        judge_zs_reverse = 0
+
+    #判断结尾的第一种方法
+    # if zs_sx <= len(ddata) - 3:
+    #     if segdir == zs_dir:
+    #         if ((segdir==0) and (ddata[-1][1]<ddata[-3][1]) and (ddata[-5][1]<ddata[-2][1])) \
+    #         or ((segdir==1) and (ddata[-1][1]>ddata[-3][1]) and (ddata[-5][1]>ddata[-2][1])):
+    #                 zs_ex = len(ddata) - 2
+    #         else:
+    #             zs_ex = zs_sx + 1
+    #         mark_areas.append(gen_zs_pos(ddata[zs_sx][0],zs_high,ddata[zs_ex][0],zs_low))
+    #     elif segdir != zs_dir:
+    #         if (ddata[-2] != ddata[zs_sx+2])\
+    #         and ( ((segdir==1) and (ddata[-2][1]<ddata[zs_sx][1]) and (ddata[-2][1]<ddata[zs_sx+2][1]))\
+    #             or((segdir==0) and (ddata[-2][1]>ddata[zs_sx][1]) and (ddata[-2][1]>ddata[zs_sx+2][1]))):
+    #             zs_ex = len(ddata) - 3
+    #         else:
+    #             zs_ex = zs_sx + 1
+    #         mark_areas.append(gen_zs_pos(ddata[zs_sx][0],zs_high,ddata[zs_ex][0],zs_low))
+
+    #判断结尾的第二种方法
+    if zs_sx < len(ddata) - 3:
+        tmpddata = ddata[zs_sx:]
+        tmpmin = tmpddata[0]
+        tmpmax = tmpddata[0]
+        for each in tmpddata:
+            if each[1] < tmpmin[1]:
+                tmpmin = each
+            if each[1] > tmpmax[1]:
+                tmpmax = each
+        if zs_dir == 0:
+            tmpendx = ddata.index(tmpmin) - 1
+            zs_high = ddata[tmpendx][1]
+            zs_low = ddata[zs_sx][1]
+            mark_areas.append(gen_zs_pos(ddata[zs_sx][0],zs_high,ddata[tmpendx][0],zs_low))
+        elif zs_dir == 1:
+            tmpendx = ddata.index(tmpmax) - 1
+            zs_high = ddata[zs_sx][1]
+            zs_low = ddata[tmpendx][1]
+            mark_areas.append(gen_zs_pos(ddata[zs_sx][0],zs_high,ddata[tmpendx][0],zs_low))
+    else:
+        zs_ex = zs_sx + 1
+        mark_areas.append(gen_zs_pos(ddata[zs_sx][0],zs_high,ddata[zs_ex][0],zs_low))
+    
+    return mark_areas
+
+#奇数偶数检查及zs高低点判断
+def evenoddcheck(datalist, start, end,  direction):
+    newlist = datalist[start:end]
+    key = [sublist[0] for sublist in newlist]
+    value = [sublist[1] for sublist in newlist]
+    # print(start,end)
+    # print(key,value)
+    evenl = key[::2]
+    oddl = key[1::2]
+    # print(evenl,oddl)
+    evelvalue = []
+    oddvalue = []
+    for each in evenl:
+        evelvalue.append(value[key.index(each)])
+    for each in oddl:
+        oddvalue.append(value[key.index(each)])
+    if direction == 1:
+        high = min(evelvalue)
+        low = max(oddvalue)
+    elif direction == 0:
+        high = min(oddvalue)
+        low = max(evelvalue)
+    return high, low
+
+# --------------------------------------------------------------------
+# -----------------------第二种生成中枢的方式结束-----------------------
+# --------------------------------------------------------------------
 
 def cl_base(df):
     original_kline = generate_orignal_kindle_data(df)
@@ -383,4 +636,5 @@ def cl_base(df):
     contain_kline, combine_list = generate_containkline(noshadow_kline)
     draw = generate_draw(noshadow_kline, combine_list)
     zs_area = generate_zs_area(draw)
+    #zs_area = uplevel_zsbase(draw)
     return original_kline,draw,zs_area
